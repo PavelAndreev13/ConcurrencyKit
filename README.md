@@ -20,5 +20,5 @@ Add the package to your `Package.swift` file or integrate it via Xcode (File -> 
 
 ```swift
 dependencies: [
-    .package(url: "[https://github.com/YourUsername/ConcurrencyKit.git](https://github.com/YourUsername/ConcurrencyKit.git)", from: "1.0.0")
+    .package(url: "[https://github.com/PavelAndreev13/ConcurrencyKit](https://github.com/PavelAndreev13/ConcurrencyKit.git)", from: "1.0.0")
 ]
