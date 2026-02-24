@@ -51,7 +51,7 @@ public actor TaskVault {
 public extension Task {
     
     @discardableResult
-    func store(in vault: isolated TaskVault) -> Self {
+    func store(in vault: TaskVault) -> Self {
         Task<Void, Never> {
             await vault.store(self)
         }

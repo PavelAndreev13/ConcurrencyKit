@@ -58,7 +58,6 @@ final class AsyncBridgeMacroTests: XCTestCase {
             """
             @AsyncBridge
             func saveContext(completion: @escaping (Error?) -> Void) {
-                // Код сохранения
             }
             """,
             expandedSource: """
@@ -107,4 +106,31 @@ final class AsyncBridgeMacroTests: XCTestCase {
         )
         #endif
     }
+    
+    func testAsyncBridgeWithResult() throws {
+            #if canImport(ConcurrencyKitMacros)
+            assertMacroExpansion(
+                """
+                @AsyncBridge
+                func fetchPosts(completion: @escaping (Result<[String], NetworkError>) -> Void) {
+                    // Запрос в сеть
+                }
+                """,
+                expandedSource: """
+                func fetchPosts(completion: @escaping (Result<[String], NetworkError>) -> Void) {
+                    // Запрос в сеть
+                }
+                
+                func fetchPosts() async throws -> [String] {
+                    try await withCheckedThrowingContinuation { continuation in
+                        self.fetchPosts { result in
+                            continuation.resume(with: result)
+                        }
+                    }
+                }
+                """,
+                macros: testMacros
+            )
+            #endif
+        }
 }
