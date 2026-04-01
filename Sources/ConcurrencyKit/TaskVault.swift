@@ -52,9 +52,7 @@ public extension Task {
     
     @discardableResult
     func store(in vault: isolated TaskVault) -> Self {
-        Task<Void, Never> {
-            await vault.store(self)
-        }
+        vault.store(self)
         return self
     }
 }
