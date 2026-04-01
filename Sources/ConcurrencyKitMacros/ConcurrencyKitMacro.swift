@@ -10,41 +10,39 @@ public struct AsyncBridgeMacro: PeerMacro {
         providingPeersOf declaration: some DeclSyntaxProtocol,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        
+
         guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
             throw MacroError.onlyApplicableToFunctions
         }
-        
+
         let funcName = funcDecl.name.text
-        
+
         guard let completionParam = funcDecl.signature.parameterClause.parameters.last,
               let paramName = completionParam.firstName.text as String?,
               paramName.contains("completion") else {
             throw MacroError.noCompletionHandlerFound
         }
-        
+
         let typeSyntax = completionParam.type
         guard let functionType = typeSyntax.as(AttributedTypeSyntax.self)?.baseType.as(FunctionTypeSyntax.self) ??
                                  typeSyntax.as(FunctionTypeSyntax.self) else {
             throw MacroError.unsupportedCompletionFormat
         }
-        
+
         let closureParams = Array(functionType.parameters)
-        
+
         var generatedAsyncReturnType = "Void"
         var generatedBody = ""
-        
+
         if closureParams.count == 2 {
-            // ПАТТЕРН 1: (SuccessType?, Error?) -> Void
-            
-            // Получаем текстовое представление первого типа (например, "User?")
-            // и убираем знак вопроса, чтобы получить чистый тип "User"
+            // Pattern 1: (SuccessType?, Error?) -> Void
+            // Strip the optional "?" to get the clean return type (e.g. "User?" → "User")
             let rawTypeStr = closureParams[0].type.description
             let cleanTypeStr = rawTypeStr.replacingOccurrences(of: "?", with: "").trimmingCharacters(in: .whitespaces)
-            
+
             generatedAsyncReturnType = cleanTypeStr
-            
-            // Генерируем тело для функции с возвращаемым значением
+
+            // Generate the async body for a function that returns a value
             generatedBody = """
             try await withCheckedThrowingContinuation { continuation in
                 self.\(funcName) { result, error in
@@ -59,11 +57,10 @@ public struct AsyncBridgeMacro: PeerMacro {
                 }
             }
             """
-            
+
         } else if closureParams.count == 1 {
-            // ПАТТЕРН 2: (Error?) -> Void
-            // Функция ничего не возвращает, просто ждем завершения
-            
+            // Pattern 2: (Error?) -> Void
+            // The function returns Void — just wait for completion and forward any error
             generatedBody = """
             try await withCheckedThrowingContinuation { continuation in
                 self.\(funcName) { error in
@@ -75,34 +72,35 @@ public struct AsyncBridgeMacro: PeerMacro {
                 }
             }
             """
-            
+
         } else {
             throw MacroError.unsupportedCompletionFormat
         }
-        
-        // 5. Собираем новую async функцию целиком
+
+        // Assemble the full async function declaration
         let asyncFuncString = """
         func \(funcName)() async throws -> \(generatedAsyncReturnType) {
             \(generatedBody)
         }
         """
-        
-        // Возвращаем готовый узел
+
         return [DeclSyntax(stringLiteral: asyncFuncString)]
     }
 }
 
-// Расширяем список ошибок
 enum MacroError: Error, CustomStringConvertible {
     case onlyApplicableToFunctions
     case noCompletionHandlerFound
     case unsupportedCompletionFormat
-    
+
     var description: String {
         switch self {
-        case .onlyApplicableToFunctions: return "@AsyncBridge применим только к функциям."
-        case .noCompletionHandlerFound: return "Последний параметр должен называться 'completion' или содержать это слово."
-        case .unsupportedCompletionFormat: return "Поддерживаются только замыкания вида (T?, Error?) -> Void или (Error?) -> Void."
+        case .onlyApplicableToFunctions:
+            return "@AsyncBridge can only be applied to functions."
+        case .noCompletionHandlerFound:
+            return "The last parameter must be named 'completion' or contain that word."
+        case .unsupportedCompletionFormat:
+            return "Only closures of the form (T?, Error?) -> Void or (Error?) -> Void are supported."
         }
     }
 }
@@ -124,5 +122,6 @@ public struct StringifyMacro: ExpressionMacro {
 struct ConcurrencyKitPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         StringifyMacro.self,
+        AsyncBridgeMacro.self,
     ]
 }
